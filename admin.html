@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>로그인 및 회원가입</title>
+    <title>관리 페이지</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-storage.js"></script>
     <script>
         var firebaseConfig = {
             apiKey: "AIzaSyDX0ZBiSt2qp8Q6TDMgvt_pofERgPpA_dc",
@@ -19,51 +20,157 @@
         };
         firebase.initializeApp(firebaseConfig);
 
-        function login() {
-            var email = document.getElementById('login-email').value;
-            var password = document.getElementById('login-password').value;
-            firebase.auth().signInWithEmailAndPassword(email, password)
-                .then((userCredential) => {
-                    window.location.href = "admin.html";
-                })
-                .catch((error) => {
-                    alert(error.message);
-                });
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                loadBandData(user.uid);
+            } else {
+                window.location.href = "index.html";
+            }
+        });
+
+        function loadBandData(uid) {
+            firebase.firestore().collection('bands').doc(uid).get().then(doc => {
+                if (doc.exists) {
+                    var data = doc.data();
+                    document.getElementById('bandName').value = data.bandName;
+                    document.getElementById('bandProfile').src = data.profilePicUrl || '';
+                    document.getElementById('bandIntro').value = data.intro;
+                    document.getElementById('bandMembers').value = data.members;
+                    document.getElementById('latestSong').value = data.latestSong;
+                    document.getElementById('latestSongDesc').value = data.latestSongDesc;
+                    loadBandEvents(data.events || []);
+                }
+            });
         }
 
-        function signup() {
-            var email = document.getElementById('signup-email').value;
-            var password = document.getElementById('signup-password').value;
-            var bandName = document.getElementById('signup-bandname').value;
-            firebase.auth().createUserWithEmailAndPassword(email, password)
-                .then((userCredential) => {
-                    var user = userCredential.user;
-                    return firebase.firestore().collection('users').doc(user.uid).set({
-                        email: email,
-                        bandName: bandName
-                    });
+        function saveBandData() {
+            var user = firebase.auth().currentUser;
+            var bandName = document.getElementById('bandName').value;
+            var profilePicUrl = document.getElementById('bandProfile').src;
+            var intro = document.getElementById('bandIntro').value;
+            var members = document.getElementById('bandMembers').value;
+            var latestSong = document.getElementById('latestSong').value;
+            var latestSongDesc = document.getElementById('latestSongDesc').value;
+
+            firebase.firestore().collection('bands').doc(user.uid).set({
+                bandName: bandName,
+                profilePicUrl: profilePicUrl,
+                intro: intro,
+                members: members,
+                latestSong: latestSong,
+                latestSongDesc: latestSongDesc
+            }).then(() => {
+                alert("밴드 정보가 저장되었습니다.");
+            }).catch((error) => {
+                console.error("Error saving document: ", error);
+            });
+        }
+
+        function loadBandEvents(events) {
+            var eventsList = document.getElementById('eventsList');
+            eventsList.innerHTML = "";
+            events.forEach(event => {
+                var eventItem = document.createElement('li');
+                eventItem.innerHTML = `
+                    <img src="${event.posterUrl}" alt="포스터" class="event-poster-small" onclick="showPoster('${event.posterUrl}')">
+                    <div>${event.date}</div>
+                    <div>${event.location}</div>
+                    <div>예매: ${event.preSalePrice} / 현매: ${event.atDoorPrice}</div>
+                    <div>${event.description}</div>
+                `;
+                eventsList.appendChild(eventItem);
+            });
+        }
+
+        function addBandEvent() {
+            var eventDate = document.getElementById('eventDate').value;
+            var eventLocation = document.getElementById('eventLocation').value;
+            var preSalePrice = document.getElementById('preSalePrice').value;
+            var atDoorPrice = document.getElementById('atDoorPrice').value;
+            var eventDescription = document.getElementById('eventDescription').value;
+            var posterUrl = document.getElementById('eventPosterUrl').value;
+            var user = firebase.auth().currentUser;
+
+            firebase.firestore().collection('bands').doc(user.uid).update({
+                events: firebase.firestore.FieldValue.arrayUnion({
+                    date: eventDate,
+                    location: eventLocation,
+                    preSalePrice: preSalePrice,
+                    atDoorPrice: atDoorPrice,
+                    description: eventDescription,
+                    posterUrl: posterUrl
                 })
-                .then(() => {
-                    alert("회원가입이 완료되었습니다. 이제 로그인하세요.");
-                })
-                .catch((error) => {
-                    alert(error.message);
+            }).then(() => {
+                loadBandData(user.uid);
+                document.getElementById('eventDate').value = '';
+                document.getElementById('eventLocation').value = '';
+                document.getElementById('preSalePrice').value = '';
+                document.getElementById('atDoorPrice').value = '';
+                document.getElementById('eventDescription').value = '';
+                document.getElementById('eventPosterUrl').value = '';
+            }).catch((error) => {
+                console.error("Error adding event: ", error);
+            });
+        }
+
+        function showPoster(url) {
+            var posterModal = document.getElementById('posterModal');
+            var modalImg = document.getElementById('modalImg');
+            posterModal.style.display = "block";
+            modalImg.src = url;
+        }
+
+        function hidePoster() {
+            var posterModal = document.getElementById('posterModal');
+            posterModal.style.display = "none";
+        }
+
+        function uploadProfilePic() {
+            var file = document.getElementById('bandProfilePic').files[0];
+            var storageRef = firebase.storage().ref();
+            var uploadTask = storageRef.child('band_profiles/' + file.name).put(file);
+
+            uploadTask.on('state_changed', function(snapshot){
+                // Progress monitoring
+            }, function(error) {
+                // Handle unsuccessful uploads
+                console.error("Error uploading file:", error);
+            }, function() {
+                // Handle successful uploads on complete
+                uploadTask.snapshot.ref.getDownloadURL().then(function(downloadURL) {
+                    document.getElementById('bandProfile').src = downloadURL;
                 });
+            });
         }
     </script>
 </head>
 <body>
-    <div class="container">
-        <div class="form-container">
-            <h2>로그인</h2>
-            <input type="email" id="login-email" placeholder="이메일">
-            <input type="password" id="login-password" placeholder="비밀번호">
-            <button onclick="login()">로그인</button>
-        </div>
-        <div class="form-container">
-            <h2>회원가입</h2>
-            <input type="email" id="signup-email" placeholder="이메일">
-            <input type="password" id="signup-password" placeholder="비밀번호">
-            <input type="text" id="signup-bandname" placeholder="밴드 이름">
-            <button onclick="signup()">회원가입</button>
-  
+    <div class="admin-container">
+        <h2>밴드 관리 페이지</h2>
+        <input type="text" id="bandName" placeholder="밴드 이름">
+        <input type="file" id="bandProfilePic" onchange="uploadProfilePic()">
+        <img id="bandProfile" src="" alt="프로필 사진">
+        <textarea id="bandIntro" placeholder="밴드 소개"></textarea>
+        <textarea id="bandMembers" placeholder="멤버 소개"></textarea>
+        <input type="text" id="latestSong" placeholder="최신곡 유튜브 링크">
+        <textarea id="latestSongDesc" placeholder="곡 설명"></textarea>
+        <button onclick="saveBandData()">저장</button>
+
+        <h3>밴드 일정</h3>
+        <input type="date" id="eventDate">
+        <input type="text" id="eventLocation" placeholder="장소">
+        <input type="text" id="preSalePrice" placeholder="예매 가격">
+        <input type="text" id="atDoorPrice" placeholder="현매 가격">
+        <textarea id="eventDescription" placeholder="일정 설명"></textarea>
+        <input type="text" id="eventPosterUrl" placeholder="포스터 URL">
+        <button onclick="addBandEvent()">일정 추가</button>
+        <ul id="eventsList"></ul>
+    </div>
+
+    <!-- 포스터 모달 -->
+    <div id="posterModal" class="modal">
+        <span class="close" onclick="hidePoster()">&times;</span>
+        <img class="modal-content" id="modalImg">
+    </div>
+</body>
+</html>
