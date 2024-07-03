@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>관리 페이지</title>
+    <title>밴드 페이지</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-storage.js"></script>
     <script>
         var firebaseConfig = {
             apiKey: "AIzaSyDX0ZBiSt2qp8Q6TDMgvt_pofERgPpA_dc",
@@ -20,58 +19,36 @@
         };
         firebase.initializeApp(firebaseConfig);
 
-        firebase.auth().onAuthStateChanged(user => {
-            if (user) {
-                loadBandData(user.uid);
-                generateBandLink(user.uid);
-            } else {
-                window.location.href = "index.html";
-            }
-        });
-
-        function loadBandData(uid) {
-            firebase.firestore().collection('bands').doc(uid).get().then(doc => {
-                if (doc.exists) {
-                    var data = doc.data();
-                    document.getElementById('bandName').value = data.bandName;
-                    document.getElementById('bandProfile').src = data.profilePicUrl || '';
-                    document.getElementById('bandIntro').value = data.intro;
-                    document.getElementById('bandMembers').value = data.members;
-                    document.getElementById('latestSong').value = data.latestSong;
-                    document.getElementById('latestSongDesc').value = data.latestSongDesc;
-                    loadBandEvents(data.events || []);
-                }
-            });
+        function getBandIdFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('id');
         }
 
-        function saveBandData() {
-            var user = firebase.auth().currentUser;
-            var bandName = document.getElementById('bandName').value;
-            var profilePicUrl = document.getElementById('bandProfile').src;
-            var intro = document.getElementById('bandIntro').value;
-            var members = document.getElementById('bandMembers').value;
-            var latestSong = document.getElementById('latestSong').value;
-            var latestSongDesc = document.getElementById('latestSongDesc').value;
-
-            firebase.firestore().collection('bands').doc(user.uid).set({
-                bandName: bandName,
-                profilePicUrl: profilePicUrl,
-                intro: intro,
-                members: members,
-                latestSong: latestSong,
-                latestSongDesc: latestSongDesc
-            }).then(() => {
-                alert("밴드 정보가 저장되었습니다.");
-            }).catch((error) => {
-                console.error("Error saving document: ", error);
-            });
+        function loadBandData() {
+            const bandId = getBandIdFromUrl();
+            if (bandId) {
+                firebase.firestore().collection('bands').doc(bandId).get().then(doc => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        document.getElementById('bandName').textContent = data.bandName;
+                        document.getElementById('bandProfile').src = data.profilePicUrl || '';
+                        document.getElementById('bandIntro').textContent = data.intro;
+                        document.getElementById('bandMembers').textContent = data.members;
+                        document.getElementById('latestSong').href = data.latestSong;
+                        document.getElementById('latestSongDesc').textContent = data.latestSongDesc;
+                        loadBandEvents(data.events || []);
+                    }
+                });
+            } else {
+                alert("밴드 ID를 찾을 수 없습니다.");
+            }
         }
 
         function loadBandEvents(events) {
-            var eventsList = document.getElementById('eventsList');
+            const eventsList = document.getElementById('eventsList');
             eventsList.innerHTML = "";
             events.forEach(event => {
-                var eventItem = document.createElement('li');
+                const eventItem = document.createElement('li');
                 eventItem.innerHTML = `
                     <img src="${event.posterUrl}" alt="포스터" class="event-poster-small" onclick="showPoster('${event.posterUrl}')">
                     <div>${event.date}</div>
@@ -81,72 +58,6 @@
                 `;
                 eventsList.appendChild(eventItem);
             });
-        }
-
-        function addBandEvent() {
-            var eventDate = document.getElementById('eventDate').value;
-            var eventLocation = document.getElementById('eventLocation').value;
-            var preSalePrice = document.getElementById('preSalePrice').value;
-            var atDoorPrice = document.getElementById('atDoorPrice').value;
-            var eventDescription = document.getElementById('eventDescription').value;
-            var file = document.getElementById('eventPoster').files[0];
-            var user = firebase.auth().currentUser;
-
-            if (file) {
-                var storageRef = firebase.storage().ref();
-                var uploadTask = storageRef.child('event_posters/' + file.name).put(file);
-
-                uploadTask.on('state_changed', function(snapshot){
-                    // Progress monitoring
-                }, function(error) {
-                    // Handle unsuccessful uploads
-                    console.error("Error uploading file:", error);
-                }, function() {
-                    uploadTask.snapshot.ref.getDownloadURL().then(function(downloadURL) {
-                        firebase.firestore().collection('bands').doc(user.uid).update({
-                            events: firebase.firestore.FieldValue.arrayUnion({
-                                date: eventDate,
-                                location: eventLocation,
-                                preSalePrice: preSalePrice,
-                                atDoorPrice: atDoorPrice,
-                                description: eventDescription,
-                                posterUrl: downloadURL
-                            })
-                        }).then(() => {
-                            loadBandData(user.uid);
-                            document.getElementById('eventDate').value = '';
-                            document.getElementById('eventLocation').value = '';
-                            document.getElementById('preSalePrice').value = '';
-                            document.getElementById('atDoorPrice').value = '';
-                            document.getElementById('eventDescription').value = '';
-                            document.getElementById('eventPoster').value = '';
-                        }).catch((error) => {
-                            console.error("Error adding event: ", error);
-                        });
-                    });
-                });
-            } else {
-                firebase.firestore().collection('bands').doc(user.uid).update({
-                    events: firebase.firestore.FieldValue.arrayUnion({
-                        date: eventDate,
-                        location: eventLocation,
-                        preSalePrice: preSalePrice,
-                        atDoorPrice: atDoorPrice,
-                        description: eventDescription,
-                        posterUrl: ''
-                    })
-                }).then(() => {
-                    loadBandData(user.uid);
-                    document.getElementById('eventDate').value = '';
-                    document.getElementById('eventLocation').value = '';
-                    document.getElementById('preSalePrice').value = '';
-                    document.getElementById('atDoorPrice').value = '';
-                    document.getElementById('eventDescription').value = '';
-                    document.getElementById('eventPoster').value = '';
-                }).catch((error) => {
-                    console.error("Error adding event: ", error);
-                });
-            }
         }
 
         function showPoster(url) {
@@ -161,59 +72,23 @@
             posterModal.style.display = "none";
         }
 
-        function uploadProfilePic() {
-            var file = document.getElementById('bandProfilePic').files[0];
-            var storageRef = firebase.storage().ref();
-            var uploadTask = storageRef.child('band_profiles/' + file.name).put(file);
-
-            uploadTask.on('state_changed', function(snapshot){
-                // Progress monitoring
-            }, function(error) {
-                // Handle unsuccessful uploads
-                console.error("Error uploading file:", error);
-            }, function() {
-                uploadTask.snapshot.ref.getDownloadURL().then(function(downloadURL) {
-                    document.getElementById('bandProfile').src = downloadURL;
-                });
-            });
-        }
-
-        function generateBandLink(uid) {
-            const bandLink = `${window.location.origin}/introduce/band.html?id=${uid}`;
-            document.getElementById('bandLink').value = bandLink;
-        }
-
-        function copyBandLink() {
-            var bandLink = document.getElementById('bandLink');
-            bandLink.select();
-            bandLink.setSelectionRange(0, 99999);
-            document.execCommand("copy");
-            alert("밴드 소개 링크가 복사되었습니다: " + bandLink.value);
-        }
+        window.onload = function() {
+            loadBandData();
+        };
     </script>
 </head>
 <body>
-    <div class="admin-container">
-        <button onclick="copyBandLink()">밴드 소개 링크 복사하기</button>
-        <input type="text" id="bandLink" readonly style="width: 100%; margin-top: 10px;">
-        <h2>밴드 관리 페이지</h2>
-        <input type="text" id="bandName" placeholder="밴드 이름">
-        <input type="file" id="bandProfilePic" onchange="uploadProfilePic()">
+    <div class="band-container">
+        <h1 id="bandName"></h1>
         <img id="bandProfile" src="" alt="프로필 사진">
-        <textarea id="bandIntro" placeholder="밴드 소개"></textarea>
-        <textarea id="bandMembers" placeholder="멤버 소개"></textarea>
-        <input type="text" id="latestSong" placeholder="최신곡 유튜브 링크">
-        <textarea id="latestSongDesc" placeholder="곡 설명"></textarea>
-        <button onclick="saveBandData()">저장</button>
-
-        <h3>밴드 일정</h3>
-        <input type="date" id="eventDate">
-        <input type="text" id="eventLocation" placeholder="장소">
-        <input type="text" id="preSalePrice" placeholder="예매 가격">
-        <input type="text" id="atDoorPrice" placeholder="현매 가격">
-        <textarea id="eventDescription" placeholder="일정 설명"></textarea>
-        <input type="file" id="eventPoster">
-        <button onclick="addBandEvent()">일정 추가</button>
+        <h2>밴드 소개</h2>
+        <p id="bandIntro"></p>
+        <h2>멤버 소개</h2>
+        <p id="bandMembers"></p>
+        <h2>최신 곡</h2>
+        <a id="latestSong" href="" target="_blank">유튜브로 이동</a>
+        <p id="latestSongDesc"></p>
+        <h2>밴드 일정</h2>
         <ul id="eventsList"></ul>
     </div>
 
@@ -223,3 +98,4 @@
         <img class="modal-content" id="modalImg">
     </div>
 </body>
+</html>
