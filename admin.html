@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리 페이지</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+    <script>
+        // Firebase 초기화
+        var firebaseConfig = {
+            apiKey: "AIzaSyDX0ZBiSt2qp8Q6TDMgvt_pofERgPpA_dc",
+            authDomain: "indie-inventory.firebaseapp.com",
+            projectId: "indie-inventory",
+            storageBucket: "indie-inventory.appspot.com",
+            messagingSenderId: "510795992497",
+            appId: "1:510795992497:web:544d12465e5678b1660190"
+        };
+        firebase.initializeApp(firebaseConfig);
+
+        // 페이지 로드 시 현재 로그인 상태 확인
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                loadBandData(user.uid);
+            } else {
+                window.location.href = "index.html";
+            }
+        });
+
+        // 밴드 데이터 로드
+        function loadBandData(uid) {
+            firebase.firestore().collection('bands').doc(uid).get().then(doc => {
+                if (doc.exists) {
+                    var data = doc.data();
+                    document.getElementById('bandName').value = data.bandName;
+                    document.getElementById('bandProfile').src = data.profilePicUrl || '';
+                    document.getElementById('bandIntro').value = data.intro;
+                    document.getElementById('bandMembers').value = data.members;
+                    document.getElementById('latestSong').value = data.latestSong;
+                    document.getElementById('latestSongDesc').value = data.latestSongDesc;
+                    loadBandEvents(data.events || []);
+                }
+            });
+        }
+
+        // 밴드 데이터 저장
+        function saveBandData() {
+            var user = firebase.auth().currentUser;
+            var bandName = document.getElementById('bandName').value;
+            var profilePicUrl = document.getElementById('bandProfile').src;
+            var intro = document.getElementById('bandIntro').value;
+            var members = document.getElementById('bandMembers').value;
+            var latestSong = document.getElementById('latestSong').value;
+            var latestSongDesc = document.getElementById('latestSongDesc').value;
+            var events = [];
+
+            firebase.firestore().collection('bands').doc(user.uid).set({
+                bandName: bandName,
+                profilePicUrl: profilePicUrl,
+                intro: intro,
+                members: members,
+                latestSong: latestSong,
+                latestSongDesc: latestSongDesc,
+                events: events
+            }).then(() => {
+                alert("밴드 정보가 저장되었습니다.");
+            }).catch((error) => {
+                console.error("Error saving document: ", error);
+            });
+        }
+
+        // 밴드 일정 로드
+        function loadBandEvents(events) {
+            var eventsList = document.getElementById('eventsList');
+            eventsList.innerHTML = "";
+            events.forEach(event => {
+                var eventItem = document.createElement('li');
+                eventItem.textContent = event.date + ' - ' + event.description;
+                eventsList.appendChild(eventItem);
+            });
+        }
+
+        // 새로운 밴드 일정 추가
+        function addBandEvent() {
+            var eventDate = document.getElementById('eventDate').value;
+            var eventDescription = document.getElementById('eventDescription').value;
+            var user = firebase.auth().currentUser;
+
+            firebase.firestore().collection('bands').doc(user.uid).update({
+                events: firebase.firestore.FieldValue.arrayUnion({
+                    date: eventDate,
+                    description: eventDescription
+                })
+            }).then(() => {
+                loadBandData(user.uid);
+                document.getElementById('eventDate').value = '';
+                document.getElementById('eventDescription').value = '';
+            }).catch((error) => {
+                console.error("Error adding event: ", error);
+            });
+        }
+    </script>
+</head>
+<body>
+    <div class="admin-container">
+        <h2>밴드 관리 페이지</h2>
+        <input type="text" id="bandName" placeholder="밴드 이름">
+        <input type="file" id="bandProfilePic" onchange="uploadProfilePic()">
+        <img id="bandProfile" src="" alt="프로필 사진">
+        <textarea id="bandIntro" placeholder="밴드 소개"></textarea>
+        <textarea id="bandMembers" placeholder="멤버 소개"></textarea>
+        <input type="text" id="latestSong" placeholder="최신곡 유튜브 링크">
+        <textarea id="latestSongDesc" placeholder="곡 설명"></textarea>
+        <button onclick="saveBandData()">저장</button>
+
+        <h3>밴드 일정</h3>
+        <input type="date" id="eventDate">
+        <textarea id="eventDescription" placeholder="일정 설명"></textarea>
+        <button onclick="addBandEvent()">일정 추가</button>
+        <ul id="eventsList"></ul>
+    </div>
+</body>
+</html>
