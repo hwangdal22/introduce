@@ -1,82 +1,101 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>밴드 페이지</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
-    <script>
-        // Firebase 초기화
-        var firebaseConfig = {
-            apiKey: "AIzaSyDX0ZBiSt2qp8Q6TDMgvt_pofERgPpA_dc",
-            authDomain: "indie-inventory.firebaseapp.com",
-            projectId: "indie-inventory",
-            storageBucket: "indie-inventory.appspot.com",
-            messagingSenderId: "510795992497",
-            appId: "1:510795992497:web:544d12465e5678b1660190"
-        };
-        firebase.initializeApp(firebaseConfig);
+/* 공통 스타일 */
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f0f0f0;
+    min-height: 100vh;
+}
 
-        // URL 파라미터에서 밴드 ID 가져오기
-        function getBandIdFromUrl() {
-            const params = new URLSearchParams(window.location.search);
-            return params.get('id');
-        }
+.container, .admin-container, .band-container {
+    width: 90%;
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+    background: white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+}
 
-        // 밴드 데이터 로드
-        function loadBandData() {
-            const bandId = getBandIdFromUrl();
-            if (bandId) {
-                firebase.firestore().collection('bands').doc(bandId).get().then(doc => {
-                    if (doc.exists) {
-                        const data = doc.data();
-                        document.getElementById('bandName').textContent = data.bandName;
-                        document.getElementById('bandProfile').src = data.profilePicUrl || '';
-                        document.getElementById('bandIntro').textContent = data.intro;
-                        document.getElementById('bandMembers').textContent = data.members;
-                        document.getElementById('latestSong').href = data.latestSong;
-                        document.getElementById('latestSongDesc').textContent = data.latestSongDesc;
-                        loadBandEvents(data.events || []);
-                    }
-                });
-            } else {
-                alert("밴드 ID를 찾을 수 없습니다.");
-            }
-        }
+h2, h3 {
+    color: #333;
+    margin-bottom: 20px;
+}
 
-        // 밴드 일정 로드
-        function loadBandEvents(events) {
-            const eventsList = document.getElementById('eventsList');
-            eventsList.innerHTML = "";
-            events.forEach(event => {
-                const eventItem = document.createElement('li');
-                eventItem.textContent = event.date + ' - ' + event.description;
-                eventsList.appendChild(eventItem);
-            });
-        }
+input, textarea, button {
+    margin: 10px 0;
+    padding: 10px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
 
-        // 초기 로드 시 밴드 데이터 불러오기
-        window.onload = function() {
-            loadBandData();
-        };
-    </script>
-</head>
-<body>
-    <div class="band-container">
-        <h1 id="bandName"></h1>
-        <img id="bandProfile" src="" alt="프로필 사진">
-        <h2>밴드 소개</h2>
-        <p id="bandIntro"></p>
-        <h2>멤버 소개</h2>
-        <p id="bandMembers"></p>
-        <h2>최신 곡</h2>
-        <a id="latestSong" href="" target="_blank">유튜브로 이동</a>
-        <p id="latestSongDesc"></p>
-        <h2>밴드 일정</h2>
-        <ul id="eventsList"></ul>
-    </div>
-</body>
-</html>
+button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+img {
+    max-width: 100%;
+    border-radius: 8px;
+}
+
+textarea {
+    resize: vertical;
+}
+
+.event-poster-small {
+    width: 100px;
+    cursor: pointer;
+    margin-right: 10px;
+    border-radius: 4px;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgb(0, 0, 0);
+    background-color: rgba(0, 0, 0, 0.9);
+}
+
+.modal-content {
+    margin: auto;
+    display: block;
+    max-width: 80%;
+    max-height: 80%;
+}
+
+.close {
+    position: absolute;
+    top: 20px;
+    right: 35px;
+    color: #f1f1f1;
+    font-size: 40px;
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+.close:hover,
+.close:focus {
+    color: #bbb;
+    text-decoration: none;
+    cursor: pointer;
+}
