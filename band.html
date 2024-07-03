@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>밴드 페이지</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
+    <script>
+        // Firebase 초기화
+        var firebaseConfig = {
+            apiKey: "AIzaSyDX0ZBiSt2qp8Q6TDMgvt_pofERgPpA_dc",
+            authDomain: "indie-inventory.firebaseapp.com",
+            projectId: "indie-inventory",
+            storageBucket: "indie-inventory.appspot.com",
+            messagingSenderId: "510795992497",
+            appId: "1:510795992497:web:544d12465e5678b1660190"
+        };
+        firebase.initializeApp(firebaseConfig);
+
+        // URL 파라미터에서 밴드 ID 가져오기
+        function getBandIdFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('id');
+        }
+
+        // 밴드 데이터 로드
+        function loadBandData() {
+            const bandId = getBandIdFromUrl();
+            if (bandId) {
+                firebase.firestore().collection('bands').doc(bandId).get().then(doc => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        document.getElementById('bandName').textContent = data.bandName;
+                        document.getElementById('bandProfile').src = data.profilePicUrl || '';
+                        document.getElementById('bandIntro').textContent = data.intro;
+                        document.getElementById('bandMembers').textContent = data.members;
+                        document.getElementById('latestSong').href = data.latestSong;
+                        document.getElementById('latestSongDesc').textContent = data.latestSongDesc;
+                        loadBandEvents(data.events || []);
+                    }
+                });
+            } else {
+                alert("밴드 ID를 찾을 수 없습니다.");
+            }
+        }
+
+        // 밴드 일정 로드
+        function loadBandEvents(events) {
+            const eventsList = document.getElementById('eventsList');
+            eventsList.innerHTML = "";
+            events.forEach(event => {
+                const eventItem = document.createElement('li');
+                eventItem.textContent = event.date + ' - ' + event.description;
+                eventsList.appendChild(eventItem);
+            });
+        }
+
+        // 초기 로드 시 밴드 데이터 불러오기
+        window.onload = function() {
+            loadBandData();
+        };
+    </script>
+</head>
+<body>
+    <div class="band-container">
+        <h1 id="bandName"></h1>
+        <img id="bandProfile" src="" alt="프로필 사진">
+        <h2>밴드 소개</h2>
+        <p id="bandIntro"></p>
+        <h2>멤버 소개</h2>
+        <p id="bandMembers"></p>
+        <h2>최신 곡</h2>
+        <a id="latestSong" href="" target="_blank">유튜브로 이동</a>
+        <p id="latestSongDesc"></p>
+        <h2>밴드 일정</h2>
+        <ul id="eventsList"></ul>
+    </div>
+</body>
+</html>
